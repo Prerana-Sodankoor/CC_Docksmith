@@ -1,0 +1,6 @@
+FROM alpine:3.18
+WORKDIR /app
+COPY . /app
+RUN echo hello
+ENV MODE=prod
+CMD ["python","main.py"]
