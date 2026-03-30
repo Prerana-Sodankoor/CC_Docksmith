@@ -15,6 +15,6 @@ typedef struct {
 } InstructionList;
 
 void parse_docksmithfile(const char *path, InstructionList *list);
+void print_instructions(const InstructionList *list);
 
-void print_instructions(InstructionList *list);
 #endif
