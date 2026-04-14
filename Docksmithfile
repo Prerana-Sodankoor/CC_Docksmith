@@ -1,0 +1,6 @@
+FROM alpine:3.18
+WORKDIR /app
+COPY . /app
+RUN echo "build complete" > /app/build_info.txt
+ENV MODE=production
+CMD ["/app/sample_app.sh"]

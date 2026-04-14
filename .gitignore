@@ -1,0 +1,24 @@
+# Compiled binaries
+docksmith
+cache_demo_app
+
+# Base image tars (too large, downloaded via setup_alpine.sh)
+*.tar
+*.tar.gz
+alpine.tar
+alpine.tar.gz
+
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Runtime state (never commit this)
+~/.docksmith/
+
+# Temp build artifacts
+/tmp/docksmith-*
+
+# Misc
+pdf_text.txt

@@ -1,0 +1,7 @@
+FROM alpine:3.18
+ENV APP_MODE=Production
+ENV USER_NAME=DefaultGuest
+WORKDIR /demo_app
+COPY . /demo_app
+RUN chmod +x app.sh && sh -c "echo 'Successfully executed isolation!' > build_stamp.txt"
+CMD ["/demo_app/app.sh"]
