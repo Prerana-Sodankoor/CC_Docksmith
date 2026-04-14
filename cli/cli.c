@@ -75,6 +75,28 @@ static void iso8601_now(char *buf, size_t sz)
     strftime(buf, sz, "%Y-%m-%dT%H:%M:%SZ", tm);
 }
 
+/*
+ * json_escape
+ * Escapes backslashes and double-quotes so a raw C string can be safely
+ * embedded inside a JSON string literal.  Also escapes control chars.
+ * `out` must be at least 2*strlen(in)+1 bytes.
+ */
+static void json_escape(const char *in, char *out, size_t out_sz)
+{
+    size_t j = 0;
+    for (size_t i = 0; in[i] && j + 3 < out_sz; i++) {
+        unsigned char c = (unsigned char)in[i];
+        if (c == '\\') { out[j++] = '\\'; out[j++] = '\\'; }
+        else if (c == '"')  { out[j++] = '\\'; out[j++] = '"';  }
+        else if (c == '\n') { out[j++] = '\\'; out[j++] = 'n';  }
+        else if (c == '\r') { out[j++] = '\\'; out[j++] = 'r';  }
+        else if (c == '\t') { out[j++] = '\\'; out[j++] = 't';  }
+        else if (c < 0x20) { /* skip other control chars */ }
+        else { out[j++] = (char)c; }
+    }
+    out[j] = '\0';
+}
+
 static void safe_name(const char *tag, char *out)
 {
     strncpy(out, tag, PATH_BUF - 1);
@@ -207,27 +229,31 @@ static int write_manifest(const char *image_ref,
         iso8601_now(timestamp, sizeof(timestamp));
     }
 
-    /* Build Env JSON array */
+    /* Build Env JSON array — escape key and value */
     char env_json[2048] = "[";
     for (int i = 0; i < result->env_count; i++) {
-        char entry[512];
+        char ek[256], ev[256], entry[600];
+        json_escape(result->env[i].key,   ek, sizeof(ek));
+        json_escape(result->env[i].value, ev, sizeof(ev));
         snprintf(entry, sizeof(entry), "\"%s=%s\"%s",
-                 result->env[i].key, result->env[i].value,
+                 ek, ev,
                  (i < result->env_count - 1) ? "," : "");
         strncat(env_json, entry, sizeof(env_json) - strlen(env_json) - 1);
     }
     strncat(env_json, "]", sizeof(env_json) - strlen(env_json) - 1);
 
-    /* Build layers JSON array */
-    char layers_json[8192] = "[\n";
+    /* Build layers JSON array — escape createdBy */
+    char layers_json[16384] = "[\n";
     for (int i = 0; i < result->layers.count; i++) {
+        char cb_escaped[512];
+        json_escape(result->layers.created_by[i], cb_escaped, sizeof(cb_escaped));
         char entry[1024];
         snprintf(entry, sizeof(entry),
                  "    { \"digest\": \"sha256:%s\", \"size\": %zu,"
                  " \"createdBy\": \"%s\" }%s\n",
                  result->layers.digests[i],
                  result->layers.sizes[i],
-                 result->layers.created_by[i],
+                 cb_escaped,
                  (i < result->layers.count - 1) ? "," : "");
         strncat(layers_json, entry,
                 sizeof(layers_json) - strlen(layers_json) - 1);
@@ -235,7 +261,12 @@ static int write_manifest(const char *image_ref,
     strncat(layers_json, "  ]", sizeof(layers_json) - strlen(layers_json) - 1);
 
     /* Canonical form with digest="" for computing the manifest digest */
-    char canonical[16384];
+    char ename[256], etag[256], eworkdir[512];
+    json_escape(name,               ename,    sizeof(ename));
+    json_escape(tag,                etag,     sizeof(etag));
+    json_escape(result->working_dir, eworkdir, sizeof(eworkdir));
+
+    char canonical[32768];
     snprintf(canonical, sizeof(canonical),
              "{\n"
              "  \"name\": \"%s\",\n"
@@ -249,14 +280,14 @@ static int write_manifest(const char *image_ref,
              "  },\n"
              "  \"layers\": %s\n"
              "}",
-             name, tag, timestamp,
-             env_json, result->cmd, result->working_dir, layers_json);
+             ename, etag, timestamp,
+             env_json, (result->cmd && result->cmd[0]) ? result->cmd : "[]", eworkdir, layers_json);
 
     char manifest_digest[65];
     sha256_of_string(canonical, manifest_digest);
 
     /* Final manifest */
-    char final_json[16384];
+    char final_json[32768];
     snprintf(final_json, sizeof(final_json),
              "{\n"
              "  \"name\": \"%s\",\n"
@@ -270,8 +301,8 @@ static int write_manifest(const char *image_ref,
              "  },\n"
              "  \"layers\": %s\n"
              "}",
-             name, tag, manifest_digest, timestamp,
-             env_json, result->cmd, result->working_dir, layers_json);
+             ename, etag, manifest_digest, timestamp,
+             env_json, (result->cmd && result->cmd[0]) ? result->cmd : "[]", eworkdir, layers_json);
 
     char safe[PATH_BUF], manifest_path[PATH_BUF];
     safe_name(image_ref, safe);
@@ -380,11 +411,13 @@ void handle_build(int argc, char *argv[])
     }
 
     /*
-     * BUG6 FIX: pass existing_created so a fully-cached rebuild preserves
-     * the original timestamp → same manifest digest → reproducible builds.
+     * BUG6 FIX: pass existing_created ONLY when every COPY/RUN was a
+     * cache hit.  Spec §8: "When all steps are cache hits, the manifest
+     * is rewritten with the original created value."
      */
     if (write_manifest(tag, name_part, tag_part, &result,
-                       docksmith_dir, existing_created) != 0) {
+                       docksmith_dir,
+                       result.all_cache_hits ? existing_created : NULL) != 0) {
         fprintf(stderr, "Error: failed to write image manifest.\n");
         exit(1);
     }
@@ -544,48 +577,16 @@ void handle_rmi(const char *tag)
             char layer_path[PATH_BUF];
             snprintf(layer_path, sizeof(layer_path),
                      "%s/layers/%s.tar", docksmith_dir, digest);
-            
-            int is_shared = 0;
-            char images_dir[PATH_BUF];
-            snprintf(images_dir, sizeof(images_dir), "%s/images", docksmith_dir);
-            DIR *d = opendir(images_dir);
-            if (d) {
-                struct dirent *entry;
-                char safe_current[PATH_BUF];
-                safe_name(tag, safe_current);
-                strcat(safe_current, ".json");
-                
-                while ((entry = readdir(d)) != NULL) {
-                    if (strstr(entry->d_name, ".json") == NULL) continue;
-                    if (strcmp(entry->d_name, safe_current) == 0) continue;
-                    
-                    char jpath[PATH_BUF];
-                    snprintf(jpath, sizeof(jpath), "%s/%s", images_dir, entry->d_name);
-                    FILE *jf = fopen(jpath, "r");
-                    if (jf) {
-                        char search_str[128];
-                        snprintf(search_str, sizeof(search_str), "\"sha256:%s\"", digest);
-                        char line[1024];
-                        while (fgets(line, sizeof(line), jf)) {
-                            if (strstr(line, search_str)) {
-                                is_shared = 1;
-                                break;
-                            }
-                        }
-                        fclose(jf);
-                    }
-                    if (is_shared) break;
-                }
-                closedir(d);
-            }
 
-            if (!is_shared) {
-                if (unlink(layer_path) == 0) {
-                    printf("Deleted layer: %s\n", layer_path);
-                    deleted_layers++;
-                }
-            } else {
-                printf("Skipped shared layer: %s\n", layer_path);
+            /*
+             * Spec §8: "No reference counting is performed."
+             * Unconditionally delete the layer file.  If another image
+             * references the same digest, that image will be broken.
+             * This is documented expected behaviour.
+             */
+            if (unlink(layer_path) == 0) {
+                printf("Deleted layer: %s\n", layer_path);
+                deleted_layers++;
             }
         }
         p = val + j + 1;

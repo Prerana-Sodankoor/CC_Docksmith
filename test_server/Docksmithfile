@@ -1,0 +1,6 @@
+FROM alpine:3.18
+ENV SERVER_ENV=development
+WORKDIR /app
+COPY server.sh /app/
+RUN echo "building server assets..." > build.log
+CMD ["/app/server.sh"]

@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docksmith — Container Management Dashboard</title>
+<meta name="description" content="Docksmith: A simplified Docker-like build and runtime system built from scratch. Real-time dashboard for images, layers, and build cache.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#06080d;--surface:#0d1117;--surface2:#161b22;--border:#21262d;--border2:#30363d;
+  --text:#e6edf3;--muted:#8b949e;--dimmed:#484f58;
+  --accent:#58a6ff;--accent2:#79c0ff;--green:#3fb950;--green2:#56d364;
+  --yellow:#d29922;--red:#f85149;--purple:#bc8cff;--orange:#ffa657;--cyan:#39d2c0;
+  --glow:rgba(88,166,255,.08);--glow2:rgba(88,166,255,.15);
+  --radius:10px;--radius-lg:16px;
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --mono:'JetBrains Mono','Cascadia Code','Fira Code',monospace;
+  --shadow:0 1px 3px rgba(0,0,0,.3),0 4px 12px rgba(0,0,0,.25);
+  --shadow-lg:0 4px 24px rgba(0,0,0,.4);
+}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14px;line-height:1.6;min-height:100vh;overflow-x:hidden}
+::selection{background:var(--accent);color:#000}
+
+/* === HEADER === */
+.header{background:linear-gradient(180deg,rgba(13,17,23,.98),rgba(13,17,23,.95));
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--border);
+  padding:0 28px;display:flex;align-items:center;justify-content:space-between;
+  height:60px;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:12px;font-size:18px;font-weight:700;letter-spacing:-.02em}
+.logo-icon{width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--purple));
+  display:flex;align-items:center;justify-content:center;font-size:20px;
+  box-shadow:0 0 20px rgba(88,166,255,.25)}
+.logo-sub{font-size:11px;font-weight:500;color:var(--muted);letter-spacing:.04em;background:var(--surface2);padding:2px 10px;border-radius:20px;border:1px solid var(--border2)}
+.hdr-right{display:flex;align-items:center;gap:14px}
+.pulse-dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--green)}50%{opacity:.5;box-shadow:0 0 4px var(--green)}}
+.ts{color:var(--muted);font-size:12px;font-weight:500}
+.btn{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:7px 16px;border-radius:8px;
+  cursor:pointer;font-size:12px;font-weight:600;font-family:var(--font);transition:all .2s;gap:6px;display:inline-flex;align-items:center}
+.btn:hover{background:var(--border2);border-color:var(--muted);transform:translateY(-1px);box-shadow:var(--shadow)}
+.btn:active{transform:translateY(0)}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
+.btn-danger{background:rgba(248,81,73,.1);border-color:rgba(248,81,73,.25);color:var(--red)}
+.btn-danger:hover{background:rgba(248,81,73,.2);border-color:var(--red)}
+.btn-warn{background:rgba(210,153,34,.1);border-color:rgba(210,153,34,.25);color:var(--yellow)}
+.btn-warn:hover{background:rgba(210,153,34,.2);border-color:var(--yellow)}
+.btn-accent{background:rgba(88,166,255,.1);border-color:rgba(88,166,255,.25);color:var(--accent)}
+.btn-accent:hover{background:rgba(88,166,255,.2);border-color:var(--accent)}
+
+/* === MAIN === */
+.main{padding:28px;max-width:1440px;margin:0 auto}
+
+/* === HERO / ARCHITECTURE === */
+.hero{background:linear-gradient(135deg,rgba(88,166,255,.06),rgba(188,140,255,.06),rgba(57,210,192,.04));
+  border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:32px 36px;margin-bottom:32px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-60%;right:-10%;width:400px;height:400px;
+  background:radial-gradient(ellipse,rgba(88,166,255,.08),transparent 70%);pointer-events:none}
+.hero-title{font-size:24px;font-weight:800;letter-spacing:-.03em;margin-bottom:6px;
+  background:linear-gradient(135deg,var(--text),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-desc{color:var(--muted);font-size:13px;margin-bottom:24px;max-width:600px;line-height:1.7}
+
+/* Architecture flow */
+.arch-flow{display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:center}
+.arch-node{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:14px 20px;
+  text-align:center;min-width:130px;transition:all .3s;position:relative}
+.arch-node:hover{border-color:var(--accent);box-shadow:0 0 20px rgba(88,166,255,.12);transform:translateY(-2px)}
+.arch-icon{font-size:24px;margin-bottom:6px}
+.arch-label{font-size:12px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.05em}
+.arch-sub{font-size:10px;color:var(--muted);margin-top:3px}
+.arch-arrow{color:var(--dimmed);font-size:20px;padding:0 6px;flex-shrink:0;font-weight:300}
+@media(max-width:900px){.arch-arrow{transform:rotate(90deg);padding:6px 0}}
+
+/* === SECTION HEADERS === */
+.sec-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);
+  margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.sec-title::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border),transparent)}
+
+/* === METRIC CARDS === */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px 24px;
+  transition:all .3s;position:relative;overflow:hidden}
+.card:hover{border-color:var(--border2);box-shadow:var(--shadow);transform:translateY(-2px)}
+.card::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:3px 3px 0 0;opacity:.7}
+.card.c-blue::after{background:linear-gradient(90deg,var(--accent),var(--cyan))}
+.card.c-green::after{background:linear-gradient(90deg,var(--green),var(--green2))}
+.card.c-yellow::after{background:linear-gradient(90deg,var(--yellow),var(--orange))}
+.card.c-purple::after{background:linear-gradient(90deg,var(--purple),var(--accent))}
+.card.c-red::after{background:linear-gradient(90deg,var(--red),var(--orange))}
+.card-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px}
+.card-value{font-size:32px;font-weight:800;line-height:1;margin-bottom:6px;transition:all .3s}
+.card.c-blue .card-value{color:var(--accent)}.card.c-green .card-value{color:var(--green)}
+.card.c-yellow .card-value{color:var(--yellow)}.card.c-purple .card-value{color:var(--purple)}
+.card.c-red .card-value{color:var(--red)}
+.card-sub{font-size:12px;color:var(--dimmed);font-weight:500}
+
+/* === PANELS === */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:28px;overflow:hidden;transition:all .3s}
+.panel:hover{border-color:var(--border2)}
+.ph{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.ph-left{display:flex;align-items:center;gap:12px;font-size:14px;font-weight:700}
+.ph-icon{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px}
+.ph-icon.i-blue{background:rgba(88,166,255,.12);color:var(--accent)}
+.ph-icon.i-green{background:rgba(63,185,80,.12);color:var(--green)}
+.ph-icon.i-yellow{background:rgba(210,153,34,.12);color:var(--yellow)}
+.ph-cnt{background:var(--bg);color:var(--muted);font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;border:1px solid var(--border)}
+.ph-hint{color:var(--dimmed);font-size:11px;font-style:italic;font-weight:400}
+.pb{overflow-x:auto}
+
+/* === TABLE === */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{padding:10px 18px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--dimmed);border-bottom:1px solid var(--border);white-space:nowrap;background:var(--bg)}
+td{padding:12px 18px;border-bottom:1px solid rgba(33,38,45,.6);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr{transition:background .15s}
+tbody tr:hover td{background:rgba(88,166,255,.03)}
+.mono{font-family:var(--mono);font-size:12px;font-weight:500}
+
+/* === BADGES === */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.bg{background:rgba(63,185,80,.1);color:var(--green);border:1px solid rgba(63,185,80,.2)}
+.br{background:rgba(248,81,73,.1);color:var(--red);border:1px solid rgba(248,81,73,.2)}
+.bb{background:rgba(88,166,255,.1);color:var(--accent);border:1px solid rgba(88,166,255,.2)}
+.by{background:rgba(210,153,34,.1);color:var(--yellow);border:1px solid rgba(210,153,34,.2)}
+.bp{background:rgba(188,140,255,.1);color:var(--purple);border:1px solid rgba(188,140,255,.2)}
+.bx{background:rgba(139,148,158,.1);color:var(--muted);border:1px solid rgba(139,148,158,.2)}
+
+/* === EXPAND / LAYER DETAIL === */
+.xbtn{background:none;border:1px solid var(--border2);color:var(--muted);font-size:11px;font-weight:600;
+  padding:4px 10px;border-radius:6px;cursor:pointer;transition:all .2s;font-family:var(--font)}
+.xbtn:hover{border-color:var(--accent);color:var(--accent);background:rgba(88,166,255,.05)}
+.layer-detail{background:var(--bg);border-top:1px solid var(--border);padding:16px 20px;
+  font-family:var(--mono);font-size:12px}
+.lrow{display:flex;align-items:center;gap:10px;padding:4px 0;border-bottom:1px solid rgba(33,38,45,.4)}
+.lrow:last-child{border-bottom:none}
+.lrow .ln{color:var(--dimmed);min-width:28px;text-align:right;font-weight:600}
+.lrow .ld{color:var(--accent);min-width:100px}
+.lrow .ls{color:var(--green);min-width:80px}
+.lrow .lc{color:var(--muted);flex:1}
+
+/* === ENV TAGS === */
+.env-tags{display:flex;flex-wrap:wrap;gap:4px}
+.env-tag{background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.15);color:var(--accent);
+  font-family:var(--mono);font-size:11px;font-weight:500;padding:3px 10px;border-radius:6px}
+
+/* === STORAGE BAR === */
+.sbar-wrap{padding:20px 24px}
+.sbar{height:14px;border-radius:8px;overflow:hidden;display:flex;background:var(--bg);border:1px solid var(--border);margin:10px 0}
+.sb-seg{height:100%;transition:width .6s ease}
+.sbl{background:linear-gradient(90deg,var(--accent),var(--cyan))}
+.sbm{background:linear-gradient(90deg,var(--green),var(--green2))}
+.sbc{background:linear-gradient(90deg,var(--yellow),var(--orange))}
+.sleg{display:flex;gap:24px;flex-wrap:wrap;align-items:center}
+.sleg-item{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-weight:500}
+.sleg-dot{width:12px;height:12px;border-radius:4px}
+.pchip{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:4px 12px;
+  font-family:var(--mono);font-size:12px;color:var(--dimmed);word-break:break-all}
+
+/* === CACHE RING === */
+.cache-stats{display:flex;align-items:center;gap:28px;flex-wrap:wrap;padding:20px 24px}
+.ring-wrap{width:90px;height:90px;flex-shrink:0}
+.ring{width:90px;height:90px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:conic-gradient(var(--green) 0% 0%,var(--bg) 0% 100%);
+  transition:background .5s;box-shadow:0 0 20px rgba(63,185,80,.1)}
+.ring-inner{width:62px;height:62px;border-radius:50%;background:var(--surface);display:flex;align-items:center;
+  justify-content:center;font-size:16px;font-weight:800;color:var(--green);font-family:var(--mono)}
+.cs-rows{display:flex;flex-direction:column;gap:10px}
+.cs-row{display:flex;gap:14px;align-items:center}
+.cs-lbl{color:var(--muted);font-size:12px;font-weight:500;min-width:110px}
+.cs-val{font-weight:700;font-size:14px}
+
+/* === EMPTY STATE === */
+.empty{padding:44px;text-align:center;color:var(--muted)}
+.empty-icon{font-size:36px;margin-bottom:12px;filter:grayscale(.3)}
+.empty-msg{font-size:15px;font-weight:600;margin-bottom:8px}
+.empty-hint{font-size:12px;font-family:var(--mono);color:var(--dimmed);background:var(--bg);
+  display:inline-block;padding:6px 16px;border-radius:6px;border:1px solid var(--border)}
+
+/* === TOAST === */
+#toast{position:fixed;bottom:28px;right:28px;padding:12px 22px;border-radius:var(--radius);font-size:13px;
+  font-weight:600;z-index:999;transition:all .3s;pointer-events:none;opacity:0;transform:translateY(10px);
+  backdrop-filter:blur(8px)}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.ok{background:rgba(31,61,38,.9);border:1px solid rgba(63,185,80,.35);color:var(--green)}
+#toast.err{background:rgba(61,31,31,.9);border:1px solid rgba(248,81,73,.35);color:var(--red)}
+
+/* === MODAL === */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:none;
+  align-items:center;justify-content:center;z-index:500}
+.modal-bg.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:28px;
+  max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:var(--shadow-lg)}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.modal pre{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:12px;
+  font-family:var(--mono);white-space:pre-wrap;word-break:break-all;max-height:300px;overflow-y:auto;margin-bottom:18px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end}
+
+/* === LOADING === */
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:20px;z-index:1000;transition:opacity .4s}
+.spinner{width:44px;height:44px;border:3px solid var(--border);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* === TOOLTIP === */
+[data-tip]{position:relative;cursor:help}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:11px;font-weight:500;
+  padding:6px 12px;border-radius:8px;white-space:nowrap;z-index:200;pointer-events:none;box-shadow:var(--shadow);
+  animation:tipIn .15s ease}
+@keyframes tipIn{from{opacity:0;transform:translateX(-50%) translateY(4px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* === ANIMATIONS === */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes countUp{from{opacity:0;transform:scale(.8)}to{opacity:1;transform:scale(1)}}
+.anim-in{animation:fadeUp .4s ease both}
+.anim-in:nth-child(2){animation-delay:.05s}.anim-in:nth-child(3){animation-delay:.1s}
+.anim-in:nth-child(4){animation-delay:.15s}.anim-in:nth-child(5){animation-delay:.2s}
+.card-value{animation:countUp .3s ease}
+
+/* === FOOTER === */
+.footer{text-align:center;padding:28px;color:var(--dimmed);font-size:12px;border-top:1px solid var(--border);margin-top:20px}
+.footer a{color:var(--accent);text-decoration:none;font-weight:600}
+.footer a:hover{text-decoration:underline}
+
+/* === RESPONSIVE === */
+@media(max-width:768px){
+  .main{padding:16px}.cards{grid-template-columns:repeat(2,1fr)}.hero{padding:24px}
+  th,td{padding:8px 12px}.arch-flow{gap:8px}.arch-node{min-width:100px;padding:10px 14px}
+  .header{padding:0 16px;height:52px}
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="color:var(--muted);font-size:13px;font-weight:500">Loading Docksmith state…</div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Confirm modal -->
+<div class="modal-bg" id="confirmModal">
+  <div class="modal">
+    <h3 id="modalTitle">⚠️ Confirm Action</h3>
+    <p id="modalBody" style="color:var(--muted);margin-bottom:18px;font-size:13px;line-height:1.7"></p>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger" id="modalConfirmBtn">Confirm Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Output modal -->
+<div class="modal-bg" id="outputModal">
+  <div class="modal">
+    <h3 id="outputTitle">📋 Output</h3>
+    <pre id="outputBody"></pre>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeOutputModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Header -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">🔨</div>
+    Docksmith
+    <span class="logo-sub">Dashboard</span>
+  </div>
+  <div class="hdr-right">
+    <div class="pulse-dot" id="statusDot"></div>
+    <span class="ts" id="lastUpdated">connecting…</span>
+    <button class="btn btn-warn" id="gcBtn" onclick="runGC()" disabled>🗑 GC</button>
+    <button class="btn btn-accent" onclick="fetchData()">↻ Refresh</button>
+  </div>
+</header>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- Hero: How Docksmith Works -->
+  <div class="hero" id="heroSection">
+    <div class="hero-title">How Docksmith Works</div>
+    <div class="hero-desc">
+      A simplified Docker-like build and runtime system built from scratch. No Docker, no runc, no containerd —
+      only OS primitives (<code style="color:var(--accent)">chroot</code>, <code style="color:var(--accent)">unshare</code>, <code style="color:var(--accent)">fork</code>)
+      for true process isolation.
+    </div>
+    <div class="arch-flow">
+      <div class="arch-node anim-in" data-tip="The build recipe (FROM, COPY, RUN, ENV, WORKDIR, CMD)">
+        <div class="arch-icon">📄</div>
+        <div class="arch-label">Docksmithfile</div>
+        <div class="arch-sub">6 instructions</div>
+      </div>
+      <div class="arch-arrow anim-in">→</div>
+      <div class="arch-node anim-in" data-tip="Parses instructions, executes in isolation, produces layers">
+        <div class="arch-icon">⚙️</div>
+        <div class="arch-label">Build Engine</div>
+        <div class="arch-sub">with cache</div>
+      </div>
+      <div class="arch-arrow anim-in">→</div>
+      <div class="arch-node anim-in" data-tip="Immutable tar files stored by SHA-256 digest in ~/.docksmith/layers/">
+        <div class="arch-icon">📦</div>
+        <div class="arch-label">Layers</div>
+        <div class="arch-sub">content-addressed</div>
+      </div>
+      <div class="arch-arrow anim-in">→</div>
+      <div class="arch-node anim-in" data-tip="JSON manifest with layer list, ENV, CMD, WorkingDir in ~/.docksmith/images/">
+        <div class="arch-icon">🗂️</div>
+        <div class="arch-label">Image</div>
+        <div class="arch-sub">JSON manifest</div>
+      </div>
+      <div class="arch-arrow anim-in">→</div>
+      <div class="arch-node anim-in" data-tip="fork() + unshare(CLONE_NEWNS|CLONE_NEWPID) + chroot() into assembled rootfs">
+        <div class="arch-icon">🐳</div>
+        <div class="arch-label">Container</div>
+        <div class="arch-sub">chroot + namespaces</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary cards -->
+  <div class="sec-title">System Overview</div>
+  <div class="cards">
+    <div class="card c-blue anim-in" data-tip="Image manifests stored in ~/.docksmith/images/">
+      <div class="card-label">Images</div>
+      <div class="card-value" id="cImg">—</div>
+      <div class="card-sub">in local store</div>
+    </div>
+    <div class="card c-blue anim-in" data-tip="Content-addressed tar files in ~/.docksmith/layers/">
+      <div class="card-label">Layers</div>
+      <div class="card-value" id="cLyr">—</div>
+      <div class="card-sub">content-addressed tars</div>
+    </div>
+    <div class="card c-yellow anim-in" data-tip="Layers not referenced by any image manifest — safe to GC">
+      <div class="card-label">Orphaned Layers</div>
+      <div class="card-value" id="cOrp">—</div>
+      <div class="card-sub">unreferenced — can be GC'd</div>
+    </div>
+    <div class="card c-green anim-in" data-tip="Cache key → layer digest mappings for build acceleration">
+      <div class="card-label">Cache Entries</div>
+      <div class="card-value" id="cCch">—</div>
+      <div class="card-sub" id="cCchSub">hit ratio</div>
+    </div>
+    <div class="card c-purple anim-in" data-tip="Total disk usage across images/, layers/, and cache/">
+      <div class="card-label">Total Storage</div>
+      <div class="card-value" id="cSto">—</div>
+      <div class="card-sub" id="cStoPath">~/.docksmith</div>
+    </div>
+  </div>
+
+  <!-- Storage bar -->
+  <div class="sec-title">Storage Breakdown</div>
+  <div class="panel">
+    <div class="sbar-wrap">
+      <div class="sbar">
+        <div class="sb-seg sbl" id="barL" style="width:0%"></div>
+        <div class="sb-seg sbm" id="barM" style="width:0%"></div>
+        <div class="sb-seg sbc" id="barC" style="width:0%"></div>
+      </div>
+      <div class="sleg">
+        <div class="sleg-item"><div class="sleg-dot" style="background:linear-gradient(135deg,var(--accent),var(--cyan))"></div><span>Layers: <strong id="legL">—</strong></span></div>
+        <div class="sleg-item"><div class="sleg-dot" style="background:linear-gradient(135deg,var(--green),var(--green2))"></div><span>Manifests: <strong id="legM">—</strong></span></div>
+        <div class="sleg-item"><div class="sleg-dot" style="background:linear-gradient(135deg,var(--yellow),var(--orange))"></div><span>Cache: <strong id="legC">—</strong></span></div>
+        <div class="sleg-item" style="margin-left:auto"><span style="color:var(--dimmed);font-size:11px">State dir: </span><span class="pchip" id="legP">—</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Images -->
+  <div class="sec-title">Images</div>
+  <div class="panel" id="imagesPanel">
+    <div class="ph">
+      <div class="ph-left">
+        <div class="ph-icon i-blue">📋</div>
+        Image Store <span class="ph-cnt" id="imgCnt">0</span>
+        <span class="ph-hint">JSON manifests linking layers, ENV, CMD, and WorkingDir</span>
+      </div>
+    </div>
+    <div class="pb">
+      <table>
+        <thead><tr><th>Name</th><th>Tag</th><th>Image ID</th><th data-tip="Number of tar layers in this image">Layers</th><th>Size</th><th data-tip="Default command run on container start">CMD</th><th data-tip="Environment variables injected into the container">Env</th><th>Created</th><th>Actions</th></tr></thead>
+        <tbody id="imgBody"><tr><td colspan="9"><div class="empty"><div class="empty-icon">📦</div><div class="empty-msg">No images yet</div><div class="empty-hint">sudo ./docksmith build -t myapp:latest .</div></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Layers -->
+  <div class="sec-title">Layers</div>
+  <div class="panel" id="layersPanel">
+    <div class="ph">
+      <div class="ph-left">
+        <div class="ph-icon i-green">📦</div>
+        Layer Store <span class="ph-cnt" id="lyrCnt">0</span>
+        <span class="ph-hint">Immutable, content-addressed tar files — each COPY or RUN produces one</span>
+      </div>
+    </div>
+    <div class="pb">
+      <table>
+        <thead><tr><th data-tip="First 12 chars of the SHA-256 digest of the tar file">Digest</th><th>Size</th><th>Last Modified</th><th data-tip="Which image manifests reference this layer">Used By</th><th data-tip="Active = referenced by an image, Orphan = unreferenced">Status</th></tr></thead>
+        <tbody id="lyrBody"><tr><td colspan="5"><div class="empty"><div class="empty-icon">🗄️</div><div class="empty-msg">No layers yet</div><div class="empty-hint">Layers appear after a build</div></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Cache -->
+  <div class="sec-title">Build Cache</div>
+  <div class="panel" id="cachePanel">
+    <div class="ph">
+      <div class="ph-left">
+        <div class="ph-icon i-yellow">⚡</div>
+        Cache Index <span class="ph-cnt" id="cchCnt">0</span>
+        <span class="ph-hint">Maps deterministic cache keys to layer digests for instant rebuilds</span>
+      </div>
+    </div>
+    <div class="cache-stats" id="cchStats" style="display:none">
+      <div class="ring-wrap"><div class="ring" id="cchRing"><div class="ring-inner" id="cchPct">0%</div></div></div>
+      <div class="cs-rows">
+        <div class="cs-row"><span class="cs-lbl">Total entries</span><span class="cs-val" id="csTotal">0</span></div>
+        <div class="cs-row"><span class="cs-lbl">Valid (layer exists)</span><span class="cs-val" style="color:var(--green)" id="csValid">0</span></div>
+        <div class="cs-row"><span class="cs-lbl">Dangling</span><span class="cs-val" style="color:var(--red)" id="csDang">0</span></div>
+        <div class="cs-row"><span class="cs-lbl">Clean up</span><span class="cs-val"><button class="btn btn-warn" id="gcBtn2" onclick="runGC()" disabled style="font-size:11px;padding:4px 10px">🗑 Run GC</button></span></div>
+      </div>
+      <div style="flex:1;min-width:200px;padding-left:28px;border-left:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Cache Key = SHA-256 of</div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:12px;color:var(--muted)">① <span style="color:var(--accent)">Previous layer digest</span> (chain dependency)</div>
+          <div style="font-size:12px;color:var(--muted)">② <span style="color:var(--accent)">Instruction text</span> (COPY . /app, RUN echo...)</div>
+          <div style="font-size:12px;color:var(--muted)">③ <span style="color:var(--accent)">Current WORKDIR</span> value</div>
+          <div style="font-size:12px;color:var(--muted)">④ <span style="color:var(--accent)">ENV state</span> (sorted key order)</div>
+          <div style="font-size:12px;color:var(--muted)">⑤ <span style="color:var(--accent)">Source file hashes</span> (COPY only)</div>
+        </div>
+      </div>
+    </div>
+    <div class="pb">
+      <table>
+        <thead><tr><th data-tip="Deterministic hash of instruction + context">Cache Key</th><th data-tip="The layer tar this key maps to">→ Layer Digest</th><th data-tip="Valid = layer tar exists on disk">Status</th><th>Created</th></tr></thead>
+        <tbody id="cchBody"><tr><td colspan="4"><div class="empty"><div class="empty-icon">⚡</div><div class="empty-msg">Cache is empty</div><div class="empty-hint">Entries appear after the first build</div></div></td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <strong>Docksmith</strong> — A simplified Docker-like build & runtime system built from scratch using
+  <code style="color:var(--accent)">chroot</code> + <code style="color:var(--accent)">unshare(CLONE_NEWNS|CLONE_NEWPID)</code> +
+  <code style="color:var(--accent)">fork/exec</code> for process isolation.
+  No Docker. No runc. No containerd. Pure OS primitives.
+</footer>
+
+<script>
+// ── State ──
+let _caps = { can_rmi: false, can_gc: false };
+let _confirmCallback = null;
+let _prevData = null;
+
+// ── API ──
+async function fetchData() {
+  try {
+    const r = await fetch('/api/data');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    _caps = d.capabilities || _caps;
+    render(d);
+    _prevData = d;
+    setText('lastUpdated', 'Updated ' + new Date().toLocaleTimeString());
+    document.getElementById('statusDot').style.background = 'var(--green)';
+    document.getElementById('statusDot').style.boxShadow = '0 0 8px var(--green)';
+    const ld = document.getElementById('loading');
+    if (ld.style.display !== 'none') {
+      ld.style.opacity = '0';
+      setTimeout(() => ld.style.display = 'none', 400);
+    }
+    const gc1 = document.getElementById('gcBtn');
+    const gc2 = document.getElementById('gcBtn2');
+    if (gc1) gc1.disabled = !_caps.can_gc;
+    if (gc2) gc2.disabled = !_caps.can_gc;
+  } catch(e) {
+    setText('lastUpdated', 'Error — retrying…');
+    document.getElementById('statusDot').style.background = 'var(--red)';
+    document.getElementById('statusDot').style.boxShadow = '0 0 8px var(--red)';
+  }
+}
+
+async function postAction(url, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+// ── Animated number counter ──
+function animateValue(el, target) {
+  const current = parseInt(el.textContent) || 0;
+  if (current === target) { el.textContent = target; return; }
+  const diff = target - current;
+  const steps = Math.min(Math.abs(diff), 15);
+  const stepVal = diff / steps;
+  let step = 0;
+  const timer = setInterval(() => {
+    step++;
+    el.textContent = Math.round(current + stepVal * step);
+    if (step >= steps) { clearInterval(timer); el.textContent = target; }
+  }, 30);
+}
+
+// ── Render ──
+function render(d) {
+  const s = d.summary, st = d.storage, cache = d.cache;
+
+  animateValue(document.getElementById('cImg'), s.image_count);
+  animateValue(document.getElementById('cLyr'), s.layer_count);
+  animateValue(document.getElementById('cOrp'), s.orphan_count);
+  animateValue(document.getElementById('cCch'), s.cache_entries);
+
+  setText('cCchSub', cache.hit_ratio_pct + '% valid');
+  setText('cSto', st.total_fmt);
+  setText('cStoPath', st.docksmith_dir);
+  setText('imgCnt', s.image_count);
+  setText('lyrCnt', s.layer_count);
+  setText('cchCnt', s.cache_entries);
+
+  // Storage bar
+  const tot = (st.images_size + st.layers_size + st.cache_size) || 1;
+  document.getElementById('barL').style.width = (st.layers_size/tot*100).toFixed(1)+'%';
+  document.getElementById('barM').style.width = (st.images_size/tot*100).toFixed(1)+'%';
+  document.getElementById('barC').style.width = (st.cache_size /tot*100).toFixed(1)+'%';
+  setText('legL', st.layers_size_fmt);
+  setText('legM', st.images_size_fmt);
+  setText('legC', st.cache_size_fmt);
+  setText('legP', st.docksmith_dir);
+
+  renderImages(d.images);
+  renderLayers(d.layers);
+  renderCache(cache);
+}
+
+function renderImages(images) {
+  const tb = document.getElementById('imgBody');
+  if (!images.length) {
+    tb.innerHTML = `<tr><td colspan="9"><div class="empty"><div class="empty-icon">📦</div><div class="empty-msg">No images yet</div><div class="empty-hint">sudo ./docksmith build -t myapp:latest .</div></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = images.map((img, idx) => {
+    const errBadge = img.parse_error
+      ? `<span class="badge br" title="${esc(img.parse_error)}">⚠ JSON error</span> `
+      : '';
+    const envHtml = (img.config.Env||[]).length
+      ? `<div class="env-tags">${(img.config.Env||[]).map(e => `<span class="env-tag">${esc(e)}</span>`).join('')}</div>`
+      : `<span style="color:var(--dimmed)">—</span>`;
+    const cmd = img.config.Cmd;
+    const cmdHtml = cmd && cmd.length
+      ? `<code class="mono" style="color:var(--orange)">${esc(cmd.join(' '))}</code>`
+      : `<span style="color:var(--dimmed)">—</span>`;
+    const lrows = (img.layers||[]).map((l,i) => {
+      const dg = (l.digest||'').replace('sha256:','').slice(0,12);
+      return `<div class="lrow"><span class="ln">${i+1}.</span><span class="ld">${dg}</span><span class="ls">${fmtSz(l.size||0)}</span><span class="lc">${esc(l.createdBy||'')}</span></div>`;
+    }).join('');
+    const did = `det-${idx}`;
+    const rmiBtn = _caps.can_rmi
+      ? `<button class="btn btn-danger" style="font-size:11px;padding:4px 10px" onclick="confirmRmi('${esc(img.full_name)}')">✕ rmi</button>`
+      : `<span class="badge bx" title="Start dashboard from project dir to enable">✕ rmi</span>`;
+    const workdir = img.config.WorkingDir || '/';
+    return `<tr class="anim-in" style="animation-delay:${idx*0.03}s">
+      <td>${errBadge}<strong>${esc(img.name)}</strong></td>
+      <td><span class="badge bb">${esc(img.tag)}</span></td>
+      <td><code class="mono" style="color:var(--purple)" title="${esc(img.digest)}">${esc(img.short_id)}</code></td>
+      <td style="text-align:center"><strong>${img.layer_count}</strong></td>
+      <td style="color:var(--green);font-weight:600">${img.total_size_fmt}</td>
+      <td>${cmdHtml}</td>
+      <td>${envHtml}</td>
+      <td><div style="font-weight:500">${esc(img.created)}</div><div style="color:var(--dimmed);font-size:11px">${esc(img.created_ago)}</div></td>
+      <td style="white-space:nowrap">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="xbtn" onclick="toggleDet('${did}',this)">▸ Layers</button>
+          ${rmiBtn}
+        </div>
+      </td>
+    </tr>
+    <tr id="${did}" style="display:none">
+      <td colspan="9">
+        <div class="layer-detail">
+          <div style="margin-bottom:8px;color:var(--dimmed);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">
+            Layer Stack — base (top) to latest (bottom) · WorkingDir: <span style="color:var(--accent)">${esc(workdir)}</span>
+          </div>
+          ${lrows || '<em style="color:var(--dimmed)">no layers</em>'}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderLayers(layers) {
+  const tb = document.getElementById('lyrBody');
+  if (!layers.length) {
+    tb.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="empty-icon">🗄️</div><div class="empty-msg">No layers yet</div><div class="empty-hint">Layers are created by COPY and RUN instructions</div></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = layers.map((l, idx) => {
+    const used = l.used_by.length
+      ? l.used_by.map(n => `<span class="badge bb" style="margin:1px">${esc(n)}</span>`).join(' ')
+      : `<span class="badge bx">orphaned</span>`;
+    const st = l.orphaned
+      ? `<span class="badge by">⚠ orphan</span>`
+      : `<span class="badge bg">✓ active</span>`;
+    return `<tr class="anim-in" style="animation-delay:${idx*0.02}s">
+      <td><code class="mono" style="color:var(--purple)">${esc(l.short_id)}</code>
+        <div style="color:var(--dimmed);font-size:10px;margin-top:2px;max-width:240px;overflow:hidden;text-overflow:ellipsis">${esc(l.digest)}</div></td>
+      <td style="color:var(--green);font-weight:600">${l.size_fmt}</td>
+      <td><div style="font-weight:500">${esc(l.modified)}</div><div style="color:var(--dimmed);font-size:11px">${esc(l.modified_ago)}</div></td>
+      <td>${used}</td>
+      <td>${st}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderCache(cache) {
+  const statsEl = document.getElementById('cchStats');
+  if (cache.total > 0) {
+    statsEl.style.display = 'flex';
+    const pct = cache.hit_ratio_pct;
+    document.getElementById('cchRing').style.background =
+      `conic-gradient(var(--green) 0% ${pct}%, var(--bg) ${pct}% 100%)`;
+    setText('cchPct', pct + '%');
+    setText('csTotal', cache.total);
+    setText('csValid', cache.valid);
+    setText('csDang', cache.dangling);
+  } else {
+    statsEl.style.display = 'none';
+  }
+  const tb = document.getElementById('cchBody');
+  if (!cache.entries.length) {
+    tb.innerHTML = `<tr><td colspan="4"><div class="empty"><div class="empty-icon">⚡</div><div class="empty-msg">Cache is empty</div><div class="empty-hint">Cache entries are created during builds</div></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = cache.entries.map((e, idx) => `<tr class="anim-in" style="animation-delay:${idx*0.02}s">
+    <td><code class="mono" style="color:var(--yellow)">${esc(e.short_key)}…</code></td>
+    <td><code class="mono" style="color:var(--purple)">${esc(e.short_digest)}…</code></td>
+    <td>${e.valid ? '<span class="badge bg">✓ valid</span>' : '<span class="badge br">✗ dangling</span>'}</td>
+    <td><div style="font-weight:500">${esc(e.created)}</div><div style="color:var(--dimmed);font-size:11px">${esc(e.created_ago)}</div></td>
+  </tr>`).join('');
+}
+
+// ── Actions ──
+function confirmRmi(image) {
+  document.getElementById('modalTitle').innerHTML = '⚠️ Delete Image';
+  document.getElementById('modalBody').innerHTML =
+    `This will permanently delete image <strong style="color:var(--red)">${esc(image)}</strong> and all its layer files from disk.<br><br>
+    <span style="color:var(--dimmed);font-size:12px">Note: Per spec, no reference counting is performed. Shared layers will be deleted.</span>`;
+  document.getElementById('modalConfirmBtn').textContent = '✕ Delete Image';
+  _confirmCallback = async () => {
+    closeModal();
+    showToast('Deleting ' + image + '…', false, true);
+    try {
+      const r = await postAction('/api/rmi', { image });
+      if (r.ok) {
+        showToast('✓ Deleted ' + image, true);
+        setTimeout(fetchData, 500);
+      } else {
+        showOutputModal('rmi error', r.error || r.output || 'Unknown error');
+        showToast('✗ Delete failed', false);
+      }
+    } catch(e) {
+      showToast('✗ Network error', false);
+    }
+  };
+  document.getElementById('confirmModal').classList.add('open');
+}
+
+async function runGC() {
+  showToast('Running garbage collector…', false, true);
+  try {
+    const r = await postAction('/api/gc', {});
+    showOutputModal('🗑 Garbage Collector Output', r.output || r.error || '(no output)');
+    if (r.ok) {
+      showToast('✓ GC complete', true);
+      setTimeout(fetchData, 500);
+    } else {
+      showToast('✗ GC failed', false);
+    }
+  } catch(e) {
+    showToast('✗ Network error', false);
+  }
+}
+
+function closeModal() {
+  document.getElementById('confirmModal').classList.remove('open');
+  _confirmCallback = null;
+}
+
+function showOutputModal(title, body) {
+  document.getElementById('outputTitle').textContent = title;
+  document.getElementById('outputBody').textContent  = body;
+  document.getElementById('outputModal').classList.add('open');
+}
+
+function closeOutputModal() {
+  document.getElementById('outputModal').classList.remove('open');
+}
+
+document.getElementById('modalConfirmBtn').addEventListener('click', () => {
+  if (_confirmCallback) _confirmCallback();
+});
+
+// Close modals on background click
+document.querySelectorAll('.modal-bg').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) { closeModal(); closeOutputModal(); } });
+});
+
+// ── Helpers ──
+function setText(id, v) { const el = document.getElementById(id); if (el) el.textContent = v ?? '—'; }
+function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function fmtSz(b) { for (const [u, d] of [['B',0],['KB',1],['MB',1],['GB',2]]) { if (b < 1024) return b.toFixed(d) + ' ' + u; b /= 1024; } return b.toFixed(2) + ' TB'; }
+function toggleDet(id, btn) {
+  const r = document.getElementById(id);
+  if (!r) return;
+  const open = r.style.display !== 'none';
+  r.style.display = open ? 'none' : 'table-row';
+  btn.textContent = open ? '▸ Layers' : '▾ Layers';
+}
+
+let _toastTimer = null;
+function showToast(msg, ok = true, persistent = false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + (ok ? 'ok' : 'err');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  if (!persistent) _toastTimer = setTimeout(() => { el.className = ''; }, 3500);
+}
+
+// ── Boot ──
+fetchData();
+setInterval(fetchData, 5000);
+</script>
+</body>
+</html>
