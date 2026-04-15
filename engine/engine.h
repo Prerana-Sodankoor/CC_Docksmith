@@ -39,33 +39,16 @@ typedef struct {
     rt_env_t env[32];       /* accumulated ENV key=value pairs               */
     int  env_count;
 
-    /*
-     * BUG6 FIX: base image manifest digest (NOT a layer digest).
-     * The cache module needs this as the "previous layer digest" for the
-     * first layer-producing instruction (spec §5.1).
-     * Set by handle_from(); empty string if FROM was not executed.
-     */
     char base_manifest_digest[65];
 
     /*
      * Set to 1 when every COPY/RUN step was a cache hit.
      * CLI uses this to preserve the original `created` timestamp so the
-     * manifest digest is identical across rebuilds (spec §8).
+     * manifest digest is identical across rebuilds .
      */
     int all_cache_hits;
 } BuildResult;
 
-/*
- * execute_build — main entry point called by cli.c after parsing.
- *
- * list        : parsed instructions from the Docksmithfile
- * tag         : "name:tag" string (informational; CLI writes the manifest)
- * context_dir : directory containing the Docksmithfile and build files
- * result      : populated on success
- * no_cache    : 1 = skip all cache lookups/writes (--no-cache flag)
- *
- * Returns 0 on success, -1 on any fatal error.
- */
 int execute_build(InstructionList *list,
                   const char      *tag,
                   const char      *context_dir,
