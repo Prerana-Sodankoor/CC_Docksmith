@@ -149,18 +149,6 @@ gcc main.c -o docksmith
 ./run_live_demo.sh
 ```
 
-### Run Sample Application
-
-```bash
-./sample_app.sh
-```
-
-### Demonstrate Cache
-
-```bash
-./demo_cache.sh
-```
-
 ---
 
 ## Docksmithfile
@@ -178,7 +166,8 @@ CMD ["/app/server.sh"]
 
 ---
 
-#Contributions:
+## Contributions:
+
 PES2UG23CS450: Priyanka Satish : cli module 
 PES2UG23CS417: Praagnya Parimi : Runtime module 
 PES2UG23CS446: Prerana Sodankoor : cache module
