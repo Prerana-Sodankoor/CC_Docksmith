@@ -6,17 +6,6 @@
  *   docksmith images
  *   docksmith rmi   <name:tag>
  *   docksmith run   [-e KEY=VALUE ...] <name:tag> [cmd]
- *
- * Bugs fixed:
- *   BUG1  - handle_images() called load_manifest_json(NULL,NULL) → segfault.
- *   BUG2b - handle_run() layer extraction picked up the top-level manifest
- *           digest as a layer. Fixed by scoping the search to the "layers"
- *           JSON array only, same fix as engine.c handle_from().
- *   BUG3  - handle_rmi() while-loop OR condition caused infinite loop.
- *   BUG5  - --no-cache now passed to execute_build().
- *   BUG6  - created timestamp preserved on cache-hit rebuilds.
- *   MISS2 - Step timing added.
- *   MISS3 - Successfully built line includes digest prefix and total time.
  */
 
 #include <stdio.h>
